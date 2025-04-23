@@ -1,0 +1,48 @@
+---
+title: "Making DataFrames"
+output: html_document
+date: "2025-02-07"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Packages
+
+```{r packages, include=FALSE}
+library(tidyverse)
+library(dplyr)
+library(janitor)
+library(prismatic)
+library(broom)
+library(purrr)
+```
+
+Loading merged_df
+
+```{r}
+merged_df <- read.csv("merged_df.csv")
+merged_df <- merged_df[, !names(merged_df) %in% "X"]
+```
+
+Splitting into positional based data frames
+
+```{r}
+defenders <- filter(merged_df, Pos == 1)
+midfielders <- filter(merged_df, Pos == 2)
+forwards <- filter(merged_df, Pos == 3)
+```
+
+Clean out redundant/irrelevant/correlated variables
+
+```{r}
+defenders <- defenders %>% select (-c(Min, Nineties, MnPerMatch, MnPerStart, MnPerSub, MinPerc, Compl, Subs, unSub, Gls, Ast, GA, GminPK, GPKperNine, PK, PKatt, xG, npxG, xAG, npxGxAG, xGxAG, Sh, SoT, GPerS, GPerSoT, Touches, LiveTch, AttDrib, Succ, SuccPerc, Tkld, TkldPerc, Mis, Dis, CmpTotal, AttTotal, CmpShort, AttShort, CmpMed, AttMed, CmpLong, AttLong, FKPass, Sw, TI, CK, In, Out, Str, OffPass, PassBlock, Tkl, TklW, Int, LostTkl, BlockSh, Won, Lost, SCA, GCA, PassLiveSCA, PassDeadSCA, TOSCA, ShSCA, FldSCA, DefSCA, PassLiveGCA, PassDeadGCA, TOGCA, ShGCA, FldGCA, DefGCA, onG, onGA, PlusMinus, PMperNine, OnOff, ExpOnOff, TwoCrdY, Off, Player, Born, Comp, Pos, FKShot, FKPass, PKwon))
+```
+
+Write to csv
+
+```{r}
+write.csv(defenders, '~/Desktop/Senior Seminar/defenders.csv')
+```
+

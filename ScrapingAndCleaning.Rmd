@@ -1,0 +1,516 @@
+---
+title: "Scraping and Cleaning 2023-2024"
+output: html_document
+date: "2025-01-29"
+---
+
+Packages
+
+```{r packages, include=FALSE}
+library(tidyverse,quietly=TRUE)
+library(rvest,quietly=TRUE)
+library(janitor,quietly=TRUE)
+library(dplyr,quietly=TRUE)
+library(prismatic,quietly=TRUE)
+library(broom,quietly=TRUE)
+library(purrr,quietly=TRUE)
+```
+
+Scraper
+
+```{r}
+urls = c('https://fbref.com/en/comps/Big5/2022-2023/stats/players/2022-2023-Big-5-European-Leagues-Stats',
+         'https://fbref.com/en/comps/Big5/2022-2023/shooting/players/2022-2023-Big-5-European-Leagues-Stats',
+         'https://fbref.com/en/comps/Big5/2022-2023/passing/players/2022-2023-Big-5-European-Leagues-Stats',
+         'https://fbref.com/en/comps/Big5/2022-2023/passing_types/players/2022-2023-Big-5-European-Leagues-Stats',
+         'https://fbref.com/en/comps/Big5/2022-2023/defense/players/2022-2023-Big-5-European-Leagues-Stats',
+         'https://fbref.com/en/comps/Big5/2022-2023/gca/players/2022-2023-Big-5-European-Leagues-Stats',
+         'https://fbref.com/en/comps/Big5/2022-2023/possession/players/2022-2023-Big-5-European-Leagues-Stats',
+         'https://fbref.com/en/comps/Big5/2022-2023/playingtime/players/2022-2023-Big-5-European-Leagues-Stats',
+         'https://fbref.com/en/comps/Big5/2022-2023/misc/players/2022-2023-Big-5-European-Leagues-Stats')
+
+stats=read_html(urls[1],as.data.frame=TRUE,stringAsFactors=TRUE) %>% html_nodes("table") %>% .[[1]] %>% html_table(fill=TRUE)
+
+shooting=read_html(urls[2],as.data.frame=TRUE,stringAsFactors=TRUE) %>% html_nodes("table") %>% .[[1]] %>% html_table(fill=TRUE)
+
+passing=read_html(urls[3],as.data.frame=TRUE,stringAsFactors=TRUE) %>% html_nodes("table") %>% .[[1]] %>% html_table(fill=TRUE)
+
+passing_types=read_html(urls[4],as.data.frame=TRUE,stringAsFactors=TRUE) %>% html_nodes("table") %>% .[[1]] %>% html_table(fill=TRUE)
+
+defence=read_html(urls[5],as.data.frame=TRUE,stringAsFactors=TRUE) %>% html_nodes("table") %>% .[[1]] %>% html_table(fill=TRUE)
+
+gca=read_html(urls[6],as.data.frame=TRUE,stringAsFactors=TRUE) %>% html_nodes("table") %>% .[[1]] %>% html_table(fill=TRUE)
+
+possession=read_html(urls[7],as.data.frame=TRUE,stringAsFactors=TRUE) %>% html_nodes("table") %>% .[[1]] %>% html_table(fill=TRUE)
+
+playingtime=read_html(urls[8],as.data.frame=TRUE,stringAsFactors=TRUE) %>% html_nodes("table") %>% .[[1]] %>% html_table(fill=TRUE)
+
+misc=read_html(urls[9],as.data.frame=TRUE,stringAsFactors=TRUE) %>% html_nodes("table") %>% .[[1]] %>% html_table(fill=TRUE)
+```
+
+Fixing headers
+
+```{r}
+new_header <- as.character(defence[1, ])  
+defence <- defence[-1, ]  
+colnames(defence) <- new_header
+
+new_header <- as.character(gca[1, ])  
+gca <- gca[-1, ]  
+colnames(gca) <- new_header
+
+new_header <- as.character(misc[1, ])  
+misc <- misc[-1, ]  
+colnames(misc) <- new_header
+
+new_header <- as.character(passing[1, ])  
+passing <- passing[-1, ]  
+colnames(passing) <- new_header
+
+new_header <- as.character(passing_types[1, ])
+passing_types <- passing_types[-1, ]  
+colnames(passing_types) <- new_header
+
+new_header <- as.character(playingtime[1, ])
+playingtime <- playingtime[-1, ]
+colnames(playingtime) <- new_header
+
+new_header <- as.character(possession[1, ])
+possession <- possession[-1, ]
+colnames(possession) <- new_header
+
+new_header <- as.character(shooting[1, ]) 
+shooting <- shooting[-1, ]
+colnames(shooting) <- new_header
+
+new_header <- as.character(stats[1, ])
+stats <- stats[-1, ]  
+colnames(stats) <- new_header
+```
+
+Cleaning intermittent headers out
+
+```{r}
+for (i in seq(26, nrow(defence), by = 26)) {
+  defence[i, ] <- NA
+}
+defence <- na.omit(defence)
+for (i in seq(26, nrow(gca), by = 26)) {
+  gca[i, ] <- NA
+}
+gca <- na.omit(gca)
+for (i in seq(26, nrow(misc), by = 26)) {
+  misc[i, ] <- NA
+}
+misc <- na.omit(misc)
+for (i in seq(26, nrow(passing), by = 26)) {
+  passing[i, ] <- NA
+}
+passing <- na.omit(passing)
+for (i in seq(26, nrow(passing_types), by = 26)) {
+  passing_types[i, ] <- NA
+}
+passing_types <- na.omit(passing_types)
+for (i in seq(26, nrow(playingtime), by = 26)) {
+  playingtime[i, ] <- NA
+}
+playingtime <- na.omit(playingtime)
+for (i in seq(26, nrow(possession), by = 26)) {
+  possession[i, ] <- NA
+}
+possession <- na.omit(possession)
+for (i in seq(26, nrow(shooting), by = 26)) {
+  shooting[i, ] <- NA
+}
+shooting <- na.omit(shooting)
+for (i in seq(26, nrow(stats), by = 26)) {
+  stats[i, ] <- NA
+}
+stats <- na.omit(stats)
+```
+
+Cleaning Nation, Squad, Rk, and Matches columns out
+
+```{r}
+defence <- defence[, !names(defence) %in% "Nation"]
+defence <- defence[, !names(defence) %in% "Squad"]
+gca <- gca[, !names(gca) %in% "Nation"]
+gca <- gca[, !names(gca) %in% "Squad"]
+misc <- misc[, !names(misc) %in% "Nation"]
+misc <- misc[, !names(misc) %in% "Squad"]
+passing <- passing[, !names(passing) %in% "Nation"]
+passing <- passing[, !names(passing) %in% "Squad"]
+passing_types <- passing_types[, !names(passing_types) %in% "Nation"]
+passing_types <- passing_types[, !names(passing_types) %in% "Squad"]
+playingtime <- playingtime[, !names(playingtime) %in% "Nation"]
+playingtime <- playingtime[, !names(playingtime) %in% "Squad"]
+possession <- possession[, !names(possession) %in% "Nation"]
+possession <- possession[, !names(possession) %in% "Squad"]
+shooting <- shooting[, !names(shooting) %in% "Nation"]
+shooting <- shooting[, !names(shooting) %in% "Squad"]
+stats <- stats[, !names(stats) %in% "Nation"]
+stats <- stats[, !names(stats) %in% "Squad"]
+```
+
+```{r}
+defence <- defence[, !names(defence) %in% "Rk"]
+defence <- defence[, !names(defence) %in% "Matches"]
+gca <- gca[, !names(gca) %in% "Rk"]
+gca <- gca[, !names(gca) %in% "Matches"]
+misc <- misc[, !names(misc) %in% "Rk"]
+misc <- misc[, !names(misc) %in% "Matches"]
+passing <- passing[, !names(passing) %in% "Rk"]
+passing <- passing[, !names(passing) %in% "Matches"]
+passing_types <- passing_types[, !names(passing_types) %in% "Rk"]
+passing_types <- passing_types[, !names(passing_types) %in% "Matches"]
+playingtime <- playingtime[, !names(playingtime) %in% "Rk"]
+playingtime <- playingtime[, !names(playingtime) %in% "Matches"]
+possession <- possession[, !names(possession) %in% "Rk"]
+possession <- possession[, !names(possession) %in% "Matches"]
+shooting <- shooting[, !names(shooting) %in% "Rk"]
+shooting <- shooting[, !names(shooting) %in% "Matches"]
+stats <- stats[, !names(stats) %in% "Rk"]
+stats <- stats[, !names(stats) %in% "Matches"]
+```
+
+Clean defence column names
+
+```{r}
+names(defence)[names(defence) == "Def 3rd"] <- "DefThird"
+names(defence)[names(defence) == "Mid 3rd"] <- "MidThird"
+names(defence)[names(defence) == "90s"] <- "Nineties"
+names(defence)[names(defence) == "Att 3rd"] <- "AttThird"
+names(defence)[names(defence) == "Tkl%"] <- "TklPerc"
+names(defence)[names(defence) == "Tkl+Int"] <- "TklInt"
+colnames(defence)[which(colnames(defence) == "Tkl")][2] <- "DribbleTkl"
+```
+
+Clean GCA column names
+
+```{r}
+names(gca)[names(gca) == "90s"] <- "Nineties"
+names(gca)[names(gca) == "SCA90"] <- "SCANinety"
+names(gca)[names(gca) == "GCA90"] <- "GCANinety"
+colnames(gca)[which(colnames(gca) == "PassLive")][1] <- "PassLiveSCA"
+colnames(gca)[which(colnames(gca) == "PassDead")][1] <- "PassDeadSCA"
+colnames(gca)[which(colnames(gca) == "TO")][1] <- "TOSCA"
+colnames(gca)[which(colnames(gca) == "Sh")][1] <- "ShSCA"
+colnames(gca)[which(colnames(gca) == "Fld")][1] <- "FldSCA"
+colnames(gca)[which(colnames(gca) == "Def")][1] <- "DefSCA"
+names(gca)[names(gca) == "PassLive"] <- "PassLiveGCA"
+names(gca)[names(gca) == "PassDead"] <- "PassDeadGCA"
+names(gca)[names(gca) == "TO"] <- "TOGCA"
+names(gca)[names(gca) == "Sh"] <- "ShGCA"
+names(gca)[names(gca) == "Fld"] <- "FldGCA"
+names(gca)[names(gca) == "Def"] <- "DefGCA"
+```
+
+Clean misc column names
+
+```{r}
+names(misc)[names(misc) == "90s"] <- "Nineties"
+names(misc)[names(misc) == "2CrdY"] <- "TwoCrdY"
+names(misc)[names(misc) == "Won%"] <- "WonPerc"
+```
+
+Clean passing column names
+
+```{r}
+names(passing)[names(passing) == "90s"] <- "Nineties"
+colnames(passing)[which(colnames(passing) == "Cmp")][1] <- "CmpTotal"
+colnames(passing)[which(colnames(passing) == "Att")][1] <- "AttTotal"
+colnames(passing)[which(colnames(passing) == "Cmp%")][1] <- "CmpPercTotal"
+colnames(passing)[which(colnames(passing) == "Cmp")][1] <- "CmpShort"
+colnames(passing)[which(colnames(passing) == "Att")][1] <- "AttShort"
+colnames(passing)[which(colnames(passing) == "Cmp%")][1] <- "CmpPercShort"
+colnames(passing)[which(colnames(passing) == "Cmp")][1] <- "CmpMed"
+colnames(passing)[which(colnames(passing) == "Att")][1] <- "AttMed"
+colnames(passing)[which(colnames(passing) == "Cmp%")][1] <- "CmpPercMed"
+names(passing)[names(passing) == "Cmp"] <- "CmpLong"
+names(passing)[names(passing) == "Att"] <- "AttLong"
+names(passing)[names(passing) == "Cmp%"] <- "CmpPercLong"
+names(passing)[names(passing) == "A-xAG"] <- "AxAG"
+names(passing)[names(passing) == "1/3"] <- "OneThird"
+```
+
+Cleanign passing_types column names
+
+```{r}
+names(passing_types)[names(passing_types) == "90s"] <- "Nineties"
+```
+
+Clean playingtime column names
+
+```{r}
+names(playingtime)[names(playingtime) == "Mn/MP"] <- "MnPerMatch"
+names(playingtime)[names(playingtime) == "Min%"] <- "MinPerc"
+names(playingtime)[names(playingtime) == "90s"] <- "Nineties"
+names(playingtime)[names(playingtime) == "Mn/Start"] <- "MnPerStart"
+names(playingtime)[names(playingtime) == "Mn/Sub"] <- "MnPerSub"
+names(playingtime)[names(playingtime) == "+/-"] <- "PlusMinus"
+names(playingtime)[names(playingtime) == "+/-90"] <- "PMperNine"
+names(playingtime)[names(playingtime) == "xG+/-"] <- "ExpPM"
+names(playingtime)[names(playingtime) == "xG+/-90"] <- "ExpPMperNine"
+colnames(playingtime)[which(colnames(playingtime) == "On-Off")][1] <- "OnOff"
+names(playingtime)[names(playingtime) == "On-Off"] <- "ExpOnOff"
+```
+
+Cleaning possession column names
+
+```{r}
+names(possession)[names(possession) == "90s"] <- "Nineties"
+names(possession)[names(possession) == "Def Pen"] <- "DefPen"
+names(possession)[names(possession) == "Def 3rd"] <- "DefThird"
+names(possession)[names(possession) == "Mid 3rd"] <- "MidThird"
+names(possession)[names(possession) == "Att 3rd"] <- "AttThird"
+names(possession)[names(possession) == "Att Pen"] <- "AttPen"
+names(possession)[names(possession) == "Succ%"] <- "SuccPerc"
+names(possession)[names(possession) == "Tkld%"] <- "TkldPerc"
+names(possession)[names(possession) == "1/3"] <- "OneThird"
+```
+
+Cleaning shooting column names
+
+```{r}
+names(shooting)[names(shooting) == "90s"] <- "Nineties"
+names(shooting)[names(shooting) == "SoT%"] <- "SoTPerc"
+names(shooting)[names(shooting) == "Sh/90"] <- "ShotsPerNine"
+names(shooting)[names(shooting) == "SoT/90"] <- "SoTPerNine"
+names(shooting)[names(shooting) == "G/Sh"] <- "GPerS"
+names(shooting)[names(shooting) == "G/SoT"] <- "GPerSoT"
+names(shooting)[names(shooting) == "npxG/Sh"] <- "npxGperSh"
+names(shooting)[names(shooting) == "G-xG"] <- "GminusxG"
+names(shooting)[names(shooting) == "np:G-xG"] <- "npGminusxG"
+```
+
+Cleaning stats column names
+
+```{r}
+colnames(stats)[which(colnames(stats) == "Gls")][2] <- "GlsPerNine"
+colnames(stats)[which(colnames(stats) == "Ast")][2] <- "AstPerNine"
+colnames(stats)[which(colnames(stats) == "G-PK")][2] <- "GPKperNine"
+colnames(stats)[which(colnames(stats) == "xG")][2] <- "xGperNine"
+colnames(stats)[which(colnames(stats) == "xAG")][2] <- "xAGperNine"
+colnames(stats)[which(colnames(stats) == "npxG")][2] <- "npxGperNine"
+colnames(stats)[which(colnames(stats) == "npxG+xAG")][2] <- "npxGxAGperNine"
+colnames(stats)[which(colnames(stats) == "G+A")][2] <- "GAPerNine"
+names(stats)[names(stats) == "90s"] <- "Nineties"
+names(stats)[names(stats) == "G+A"] <- "GA"
+names(stats)[names(stats) == "G-PK"] <- "GminPK"
+names(stats)[names(stats) == "npxG+xAG"] <- "npxGxAG"
+names(stats)[names(stats) == "G+A-PK"] <- "GAminPK"
+names(stats)[names(stats) == "xG+xAG"] <- "xGxAG"
+```
+
+Cleaning out repeating variable across data frames (i.e. Pos, Comp, Age, Born, etc.)
+
+```{r}
+defence <- defence[, !names(defence) %in% "Pos"]
+defence <- defence[, !names(defence) %in% "Comp"]
+gca <- gca[, !names(gca) %in% "Pos"]
+gca <- gca[, !names(gca) %in% "Comp"]
+misc <- misc[, !names(misc) %in% "Pos"]
+misc <- misc[, !names(misc) %in% "Comp"]
+passing <- passing[, !names(passing) %in% "Pos"]
+passing <- passing[, !names(passing) %in% "Comp"]
+passing_types <- passing_types[, !names(passing_types) %in% "Pos"]
+passing_types <- passing_types[, !names(passing_types) %in% "Comp"]
+playingtime <- playingtime[, !names(playingtime) %in% "Pos"]
+playingtime <- playingtime[, !names(playingtime) %in% "Comp"]
+possession <- possession[, !names(possession) %in% "Pos"]
+possession <- possession[, !names(possession) %in% "Comp"]
+shooting <- shooting[, !names(shooting) %in% "Pos"]
+shooting <- shooting[, !names(shooting) %in% "Comp"]
+defence <- defence[, !names(defence) %in% "Age"]
+defence <- defence[, !names(defence) %in% "Born"]
+gca <- gca[, !names(gca) %in% "Age"]
+gca <- gca[, !names(gca) %in% "Born"]
+misc <- misc[, !names(misc) %in% "Age"]
+misc <- misc[, !names(misc) %in% "Born"]
+passing <- passing[, !names(passing) %in% "Age"]
+passing <- passing[, !names(passing) %in% "Born"]
+passing_types <- passing_types[, !names(passing_types) %in% "Age"]
+passing_types <- passing_types[, !names(passing_types) %in% "Born"]
+playingtime <- playingtime[, !names(playingtime) %in% "Age"]
+playingtime <- playingtime[, !names(playingtime) %in% "Born"]
+possession <- possession[, !names(possession) %in% "Age"]
+possession <- possession[, !names(possession) %in% "Born"]
+shooting <- shooting[, !names(shooting) %in% "Age"]
+shooting <- shooting[, !names(shooting) %in% "Born"]
+```
+
+```{r}
+defence <- defence[, !names(defence) %in% "Nineties"]
+gca <- gca[, !names(gca) %in% "Nineties"]
+misc <- misc[, !names(misc) %in% "Nineties"]
+passing <- passing[, !names(passing) %in% "Nineties"]
+passing_types <- passing_types[, !names(passing_types) %in% "Nineties"]
+playingtime <- playingtime[, !names(playingtime) %in% "Nineties"]
+possession <- possession[, !names(possession) %in% "Nineties"]
+shooting <- shooting[, !names(shooting) %in% "Nineties"]
+```
+
+```{r}
+playingtime <- playingtime[, !names(playingtime) %in% "MP"]
+playingtime <- playingtime[, !names(playingtime) %in% "Min"]
+playingtime <- playingtime[, !names(playingtime) %in% "Starts"]
+```
+
+```{r}
+shooting <- shooting[, !names(shooting) %in% "Gls"]
+shooting <- shooting[, !names(shooting) %in% "PK"]
+shooting <- shooting[, !names(shooting) %in% "PKatt"]
+shooting <- shooting[, !names(shooting) %in% "xG"]
+shooting <- shooting[, !names(shooting) %in% "npxG"]
+names(shooting)[names(shooting) == 'FK'] <- 'FKShot'
+```
+
+```{r}
+names(possession)[names(possession) == 'DefThird'] <- 'DefThirdTch'
+names(possession)[names(possession) == 'MidThird'] <- 'MidThirdTch'
+names(possession)[names(possession) == 'AttThird'] <- 'AttThirdTch'
+names(possession)[names(possession) == 'Live'] <- 'LiveTch'
+names(possession)[names(possession) == 'Att'] <- 'AttDrib'
+names(possession)[names(possession) == 'TotDist'] <- 'TotDistCarry'
+names(possession)[names(possession) == 'PrgDist'] <- 'PrgDistCarry'
+possession <- possession[, !names(possession) %in% "PrgC"]
+names(possession)[names(possession) == 'OneThird'] <- 'OneThirdCarry'
+possession <- possession[, !names(possession) %in% "PrgR"]
+```
+
+```{r}
+names(passing_types)[names(passing_types) == 'Live'] <- 'LivePass'
+passing_types <- passing_types[, !names(passing_types) %in% "Att"]
+names(passing_types)[names(passing_types) == 'FK'] <- 'FKPass'
+passing_types <- passing_types[, !names(passing_types) %in% "Crs"]
+passing_types <- passing_types[, !names(passing_types) %in% "Cmp"]
+names(passing_types)[names(passing_types) == 'Off'] <- 'OffPass'
+names(passing_types)[names(passing_types) == 'Blocks'] <- 'PassBlock'
+```
+
+```{r}
+names(passing)[names(passing) == 'TotDist'] <- 'TotDistPass'
+names(passing)[names(passing) == 'PrgDist'] <- 'PrgDistPass'
+passing <- passing[, !names(passing) %in% "Ast"]
+passing <- passing[, !names(passing) %in% "xAG"]
+names(passing)[names(passing) == 'OneThird'] <- 'OneThirdPass'
+passing <- passing[, !names(passing) %in% "PrgP"]
+```
+
+```{r}
+misc <- misc[, !names(misc) %in% "CrdY"]
+misc <- misc[, !names(misc) %in% "CrdR"]
+misc <- misc[, !names(misc) %in% "Int"]
+misc <- misc[, !names(misc) %in% "TklW"]
+```
+
+```{r}
+names(defence)[names(defence) == 'DefThird'] <- 'DefThirdTkl'
+names(defence)[names(defence) == 'MidThird'] <- 'MidThirdTkl'
+names(defence)[names(defence) == 'AttThird'] <- 'AttThirdTkl'
+names(defence)[names(defence) == 'Att'] <- 'AttTkl'
+names(defence)[names(defence) == 'Lost'] <- 'LostTkl'
+names(defence)[names(defence) == 'Sh'] <- 'BlockSh'
+names(defence)[names(defence) == 'Pass'] <- 'BlockPass'
+```
+
+
+Recode position column
+
+```{r}
+recode_positions <- function(df) {
+    df$Pos <- sapply(strsplit(as.character(df$Pos), ","), `[`, 1)
+    
+    df$Pos[df$Pos == "GK"] <- 0
+    df$Pos[df$Pos == "DF"] <- 1
+    df$Pos[df$Pos == "MF"] <- 2
+    df$Pos[df$Pos == "FW"] <- 3
+
+    df$Pos <- as.numeric(as.character(df$Pos))
+    
+    return(df)
+}
+
+stats <- recode_positions(stats)
+```
+
+Recode competitions column
+
+```{r}
+recode_competitions <- function(df) {
+    df$Comp[df$Comp == "eng Premier League"] <- 0
+    df$Comp[df$Comp == "it Serie A"] <- 1
+    df$Comp[df$Comp == "es La Liga"] <- 2
+    df$Comp[df$Comp == "fr Ligue 1"] <- 3
+    df$Comp[df$Comp == "de Bundesliga"] <- 4
+
+    df$Comp <- as.numeric(as.character(df$Comp))
+    
+    return(df)
+}
+
+stats <- recode_competitions(stats)
+```
+
+Cleaning players out of playingtime that are not included in the other data frames
+
+```{r}
+playingtime <- playingtime[playingtime$Player %in% defence$Player, ]
+```
+
+Merge data frames
+
+```{r}
+stats <- stats %>%
+  left_join(shooting, by = "Player")
+
+stats <- stats %>%
+  left_join(possession, by = "Player")
+
+stats <- stats %>%
+  left_join(playingtime, by = "Player")
+
+stats <- stats %>%
+  left_join(passing_types, by = "Player")
+
+stats <- stats %>%
+  left_join(passing, by = "Player")
+
+stats <- stats %>%
+  left_join(misc, by = "Player")
+
+stats <- stats %>%
+  left_join(gca, by = "Player")
+
+stats <- stats %>%
+  left_join(defence, by = "Player")
+```
+
+```{r}
+merged_df <- stats %>%
+  group_by(Player) %>%
+  slice(1) %>%
+  ungroup()
+```
+
+
+Clean empty cells/rows/entries
+
+```{r}
+clean_data_frame <- function(df) {
+    df <- df[!rowSums(is.na(df) | df == "") > 0, ]
+    return(df)
+}
+
+merged_df <- clean_data_frame(merged_df)
+```
+
+Write merged_df to .csv format
+
+```{r}
+write.csv(merged_df, '~/Desktop/Senior Seminar/merged_df.csv')
+```
+
+
+
+
