@@ -1,0 +1,483 @@
+---
+title: "Modeling"
+output: html_document
+date: "2025-03-29"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Packages
+
+```{r packages, include=FALSE}
+library(tidyverse)
+library(dplyr)
+library(Stat2Data)
+library(ggplot2)
+library(skimr)
+library(BMS)
+library(leaps)
+library(car)
+library(caret)
+library(reshape2)
+library(glmnet)
+```
+
+# Calling data
+
+```{r}
+defenders <- read.csv("defenders.csv")
+defenders <- defenders[, !names(defenders) %in% "X"]
+```
+
+# Checking for correlation
+
+```{r}
+cor_defenders <- defenders[, !names(defenders) %in% "MP"]
+cor_defenders <- cor_defenders[, !names(cor_defenders) %in% "Starts"]
+```
+
+```{r}
+cor_matrix <- cor(cor_defenders)
+```
+
+Build data frame for correlated variables
+
+```{r}
+cor_threshold <- 0.80
+cor_matrix[lower.tri(cor_matrix, diag = TRUE)] <- NA
+
+cor_data <- as.data.frame(as.table(cor_matrix))
+
+cor_data <- cor_data %>%
+  filter(!is.na(Freq) & abs(Freq) > cor_threshold) %>%
+  arrange(desc(abs(Freq)))
+
+colnames(cor_data) <- c("Variable1", "Variable2", "Correlation")
+```
+
+From here, manually choose which correlated variables to remove from defenders
+
+```{r}
+# PrgC v. OneThirdCarry
+# DefThirdTkl vs. TklInt
+# KP v. Crs
+# KP vs. PPA
+# PrgDistPass v. OneThirdPass
+# PPA v. Crs
+defenders <- defenders %>% select (-c(GAminPK, GminusxG, LivePass, xGperNine, TotDistCarry, Rec, TotDistPass, Carries, AttTkl, PrgR, DefPen, ExpPM, CrsPA, Dead, xAGperNine, BlockPass, AttThirdTch, MidThirdTch, DefThirdTch, PrgP, DribbleTkl, MidThirdTkl, xA, onxG, CPA, GlsPerNine, AstPerNine, npxGperNine, ShotsPerNine, Dist, npGminusxG, AttThirdTkl, DefThirdTkl, TklPerc, AxAG, SoTPerc, CmpPercShort, CmpPercMed, CmpPercLong, npxGxAGperNine))
+```
+
+# Create data frames for modeling
+
+```{r}
+defenders_Starts <- defenders %>% select (-c(MP))
+defenders_Starts <- defenders_Starts[, c("Starts", setdiff(names(defenders_Starts), "Starts"))]
+```
+
+# Checking for VIF
+
+```{r}
+mod2 <- lm(Starts ~. , data = defenders_Starts, singular.ok = TRUE)
+summary(mod2)
+```
+
+```{r}
+vif_fun <- function(df) {
+  removed_vars <- list()
+  iteration <- 1
+  
+  while (TRUE) {
+    vifs <- car::vif(lm(Starts ~ ., data = df))
+    if (max(vifs) < 5) { 
+      break
+    }
+    highest <- names(which(vifs == max(vifs)))
+    
+    removed_vars[[paste0("Iteration_", iteration)]] <- highest
+    
+    df <- df[, -which(names(df) %in% highest)]
+    
+    iteration <- iteration + 1
+  }
+  
+  return(list(cleaned_df = df, removed_vars = removed_vars))
+}
+
+result <- vif_fun(defenders_Starts)
+
+defenders_Starts <- result$cleaned_df
+removed_variables <- result$removed_vars
+
+print(removed_variables)
+```
+
+# Uniform
+
+```{r}
+uniform = bms(defenders_Starts,burn=50000, iter=100000, g="BRIC", mprior = "uniform", nmodel=2000, mcmc="bd", user.int=F)
+```
+
+# Coefficients for basic mod
+
+```{r}
+coef(uniform)
+```
+
+# Standardized coefficients for basic mod
+
+```{r}
+coef(uniform, std.coefs=T, order.by.pip=F, include.constant=T)
+```
+
+# Sampling procedure information
+
+```{r}
+summary(uniform)
+```
+
+Verify posterior expected model size is equal to the sum of PIP's.
+
+```{r}
+sum(coef(uniform)[,1])
+```
+
+
+# Top models from basic BMA
+
+```{r}
+topmodels.bma(uniform)[,1:3]
+```
+
+# Visualize
+
+```{r}
+image(uniform)
+```
+
+# Posterior model size plot
+
+```{r}
+plotModelsize(uniform)
+```
+
+# Convergence between analytical and MCMC PMP's
+
+```{r}
+plotConv(uniform)
+```
+
+```{r}
+plotConv(uniform[1:100])
+```
+
+# PMP's of top models
+
+```{r}
+pmp.bma(uniform)[1:5,]
+```
+
+```{r}
+colSums(pmp.bma(uniform))
+```
+
+# Compare covariates in terms of PIP by analytical and MCMC methods
+
+```{r}
+coef(uniform)[1:11,]
+```
+
+```{r}
+coef(uniform,exact=TRUE)[1:11,]
+```
+
+# Binomial
+
+```{r}
+binomial = bms(defenders_Starts, burn=50000, iter=100000, g=10000, mprior="fixed", mprior.size=7, nmodel=2000, mcmc="bd", user.int=F)
+```
+
+
+# Coefficients for binomial mod
+
+```{r}
+coef(binomial)
+```
+
+# Standardized coefficients for binomial mod
+
+```{r}
+coef(binomial, std.coefs=T, order.by.pip=F, include.constant=T)
+```
+
+# Sampling procedure information
+
+```{r}
+summary(binomial)
+```
+
+Verify posterior expected model size is equal to the sum of PIP's.
+
+```{r}
+sum(coef(binomial)[,1])
+```
+
+
+# Top models from binomial BMA
+
+```{r}
+topmodels.bma(binomial)[,1:3]
+```
+
+# Visualize
+
+```{r}
+image(binomial)
+```
+
+# Posterior model size plot
+
+```{r}
+plotModelsize(binomial)
+```
+
+# Convergence between analytical and MCMC PMP's
+
+```{r}
+plotConv(binomial)
+```
+
+```{r}
+plotConv(binomial[1:100])
+```
+
+# PMP's of top models
+
+```{r}
+pmp.bma(binomial)[1:5,]
+```
+
+```{r}
+colSums(pmp.bma(binomial))
+```
+
+# Compare covariates in terms of PIP by analytical and MCMC methods
+
+```{r}
+coef(binomial)[1:11,]
+```
+
+```{r}
+coef(binomial,exact=TRUE)[1:11,]
+```
+
+# Beta
+
+```{r}
+beta = bms(defenders_Starts, burn=50000, iter=100000, g="BRIC", mprior="random", mprior.size=10, nmodel=2000, mcmc="bd", user.int = F)
+```
+
+# Coefficients for beta mod
+
+```{r}
+coef(beta)
+```
+
+# Standardized coefficients for beta mod
+
+```{r}
+coef(beta, std.coefs=T, order.by.pip=F, include.constant=T)
+```
+
+# Sampling procedure information
+
+```{r}
+summary(beta)
+```
+
+Verify posterior expected model size is equal to the sum of PIP's.
+
+```{r}
+sum(coef(beta)[,1])
+```
+
+
+# Top models from basic BMA
+
+```{r}
+topmodels.bma(beta)[,1:3]
+```
+
+# Visualize
+
+```{r}
+image(beta)
+```
+
+# Posterior model size plot
+
+```{r}
+plotModelsize(beta)
+```
+
+# Convergence between analytical and MCMC PMP's
+
+```{r}
+plotConv(beta)
+```
+
+```{r}
+plotConv(beta[1:100])
+```
+
+# PMP's of top models
+
+```{r}
+pmp.bma(beta)[1:5,]
+```
+
+```{r}
+colSums(pmp.bma(beta))
+```
+
+# Compare covariates in terms of PIP by analytical and MCMC methods
+
+```{r}
+coef(beta)[1:11,]
+```
+
+```{r}
+coef(beta,exact=TRUE)[1:11,]
+```
+
+# Comparing simulations
+
+```{r}
+plotComp(Uniform=uniform, Fixed=binomial, Random=beta)
+```
+
+# Marginal Density
+
+```{r}
+density(uniform,reg="SoTPerNine", addons = 'Eebl')
+```
+
+```{r}
+density(beta,reg="SoTPerNine", addons = 'Eebl')
+```
+
+# Predictive Density
+
+```{r}
+fcstbma= bms(defenders_Starts[1:150,], burn=50000, iter=100000, g="BRIC", mprior="random", mprior.size=10, nmodel=2000, mcmc="bd", user.int = F)
+
+pdens = pred.density(fcstbma, newdata=defenders_Starts[151:152,])
+```
+
+```{r}
+pdens
+plot(pdens, 1)
+plot(pdens, 2)
+```
+
+```{r}
+quantile(pdens, c(0.05, 0.95))
+```
+
+```{r}
+pdens$fit - defenders_Starts[151:152,1]
+```
+
+```{r}
+plot(pdens, realized.y = defenders_Starts[151:152, "Starts"])
+```
+
+```{r}
+lps.bma(pdens, defenders_Starts[151:152,1])
+```
+
+# Investigating SCANinety
+
+```{r}
+defenders_Starts$SCANinety_sq <- defenders_Starts$SCANinety^2
+SCA = bms(defenders_Starts, burn=50000, iter=100000, g="UIP", mprior="random", mprior.size=10, nmodel=2000, mcmc="bd", user.int = F)
+```
+
+```{r}
+coef(SCA)[c("SCANinety", "SCANinety_sq"), ]
+```
+
+
+```{r}
+ggplot(defenders_Starts, aes(SCANinety, Starts)) +
+  geom_point(alpha=0.6) +
+  geom_smooth(method="loess", span=0.8, color="blue")  +
+  geom_vline(xintercept = quantile(defenders_Starts$SCANinety, 0.75), 
+             linetype="dashed", color="darkgreen")
+```
+
+```{r}
+high_SCA_cutoff <- quantile(defenders_Starts$SCANinety, 0.75)
+defenders_Starts$high_sca <- as.numeric(defenders_Starts$SCANinety >= high_SCA_cutoff)
+high_SCA = bms(defenders_Starts, burn=50000, iter=100000, g="UIP", mprior="random", mprior.size=10, nmodel=2000, mcmc="bd", user.int = F)
+```
+
+```{r}
+coef(high_SCA)[c("SCANinety", "high_sca"), ]
+```
+
+# Investigating SoTPerNine
+
+```{r}
+defenders_Starts$SoTPerNine_sq <- defenders_Starts$SoTPerNine^2
+SoT = bms(defenders_Starts, burn=50000, iter=100000, g="UIP", mprior="random", mprior.size=10, nmodel=2000, mcmc="bd", user.int = F)
+```
+
+```{r}
+coef(SoT)[c("SoTPerNine", "SoTPerNine_sq"), ]
+```
+
+
+```{r}
+ggplot(defenders_Starts, aes(SoTPerNine, Starts)) +
+  geom_point(alpha=0.6) +
+  geom_smooth(method="gam", formula = y ~ s(x, bs="tp"), color="red")
+```
+
+
+```{r}
+high_sot_cutoff <- quantile(defenders_Starts$SoTPerNine, 0.75)
+defenders_Starts$high_sot <- as.numeric(defenders_Starts$SoTPerNine >= high_sot_cutoff)
+high_SoT = bms(defenders_Starts, burn=50000, iter=100000, g="UIP", mprior="random", mprior.size=10, nmodel=2000, mcmc="bd", user.int = F)
+```
+
+```{r}
+coef(high_SoT)[c("SoTPerNine", "high_sot"), ]
+```
+
+High PIP predictors
+
+```{r}
+high_pip_predictors <- c("AttPen", "OneThirdCarry", "OneThirdPass", "Fls", "Fld", "Crs", "Clr", "Blocks", "CmpPercTotal")
+defenders_PIP2 <- defenders_Starts[, c("Starts", high_pip_predictors)]
+```
+
+Simple Model
+
+```{r}
+simple_model2 <- lm(Starts ~ ., data = defenders_PIP2)
+summary(simple_model2)
+```
+
+Regression conditions
+
+```{r}
+plot(simple_model2, which = 1)
+plot(simple_model2, which = 2)
+ggplot(defenders_Starts, aes(x=residuals(simple_model2))) + geom_histogram()
+plot(simple_model2, which = 3)
+plot(simple_model2, which = 5)
+```
+
+
